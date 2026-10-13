@@ -6,9 +6,18 @@ import base64
 import time
 from pathlib import Path
 from typing import Optional, Dict, Any
+from urllib.parse import urlsplit
 import requests
 
 from .models import ExperimentResult, MockupResult
+
+
+def _v1_base_url(base_url: str) -> str:
+    """'<scheme>://<host>/api/v1' for a base URL ending in '/api', '/api/sdk' or a bare host."""
+    parts = urlsplit(base_url.strip())
+    if not parts.scheme or not parts.netloc:
+        raise ValueError(f"base_url must be an absolute URL, got {base_url!r}")
+    return f"{parts.scheme}://{parts.netloc}/api/v1"
 
 
 class FacetLabClient:
@@ -52,6 +61,9 @@ class FacetLabClient:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         })
+        from .product_tests import ProductTestsClient
+        v1_base = _v1_base_url(base_url or self.BASE_URL)
+        self.product_tests = ProductTestsClient(self.session, v1_base)
     
     def run_experiment(
         self,

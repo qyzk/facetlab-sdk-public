@@ -14,7 +14,9 @@ Usage:
 """
 
 from .client import FacetLabClient
+from .mockup import MockupClient
+from .product_tests import ProductTestsClient
 from .models import ExperimentResult, MockupResult
 
-__version__ = "0.1.0"
-__all__ = ["FacetLabClient", "ExperimentResult", "MockupResult"]
+__version__ = "0.2.0"
+__all__ = ["FacetLabClient", "ExperimentResult", "MockupResult", "ProductTestsClient", "MockupClient"]

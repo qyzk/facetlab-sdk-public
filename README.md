@@ -121,6 +121,35 @@ client = FacetLabClient(
 
 Mockup generation uses your Gemini API key (~$0.04/image billed by Google).
 
+## Product Tests
+
+```python
+from facetlab import FacetLabClient
+
+client = FacetLabClient(api_key="fl_...")       # create a key at https://qyzkdesign.com/dashboard/api-keys
+spec = {
+    "name": "Shoe cabinet page test", "market": "tiktok_us",
+    "product": {"name": "White 3-Tier Foldable Shoe Cabinet", "use": "Entryway shoe storage",
+                "dimensions": "17.3 x 13.8 x 20.87 in"},
+    "pricing": {"current_price": 37.69, "shipping": "Free shipping shown"},
+    "question": {"primary": "Would you buy this shoe cabinet at the shown price?"},
+    "arms": [{"id": "A", "label": "Original page"}, {"id": "B", "label": "Adjusted layout"},
+             {"id": "C", "label": "Price emphasized"}],
+}
+print(client.product_tests.estimate(spec))
+test = client.product_tests.create(spec, images={"A": "a.png", "B": "b.png", "C": "c.png"})
+done = client.product_tests.wait(test["id"])
+print(done["results"]["narrative"]["en"]["headline"])
+```
+
+Images must be PNG, JPEG or WebP (checked from the file contents), up to 5 MB each and at most
+80 megapixels for JPEG, 45 for PNG, 25 for transparent PNG and 12 for WebP (checked locally before upload).
+
+Credits: 1 credit = 5 sessions × 1 persona × 1 variant, so a test costs
+`persona_count × variants × ceil(sessions_per_arm / 5)` credits (e.g. 25 personas × 3 variants × 5 sessions = 75 credits).
+The free tier allows at most 50 personas and 5 sessions per variant per test (larger requests return `tier_limit`).
+A test that fails before any persona finishes is refunded automatically; partially completed failed tests are charged.
+
 ## Examples
 
 See the [examples](./examples/) folder for complete working examples:

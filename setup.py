@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name="facetlab",
-    version="0.1.0",
+    version="0.2.0",
     author="FacetLab",
     author_email="support@qyzkdesign.com",
     description="AI-powered pre-launch A/B testing and mockup generation",
