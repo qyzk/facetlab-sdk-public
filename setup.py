@@ -15,7 +15,7 @@ setup(
     description="AI-powered pre-launch A/B testing and mockup generation",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/qyzk/facetlab-sdk",
+    url="https://github.com/qyzk/facetlab-sdk-public",
     project_urls={
         "Documentation": "https://qyzkdesign.com/docs/sdk",
         "Bug Tracker": "https://github.com/qyzk/facetlab-sdk/issues",
