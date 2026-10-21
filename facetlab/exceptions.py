@@ -58,3 +58,20 @@ class MockupGenerationError(FacetLabError):
     def __init__(self, message: str, recommendation: str = None):
         super().__init__(message, code="MOCKUP_ERROR")
         self.recommendation = recommendation
+
+
+class InsufficientFundsError(FacetLabError):
+    """Raised when the prepaid balance does not cover a test (HTTP 402 insufficient_funds).
+
+    `required` and `balance` are in US dollars. Top up on the Billing page:
+    https://qyzkdesign.com/dashboard/billing
+    """
+
+    def __init__(self, message: str, required: float = None, balance: float = None, details: dict = None):
+        super().__init__(message, code="insufficient_funds", details=details)
+        self.required = required
+        self.balance = balance
+
+
+class LimitError(FacetLabError):
+    """Raised when a free-test, plan or quota limit is reached (free_tier_limit, plan_limit, quota_exceeded)."""

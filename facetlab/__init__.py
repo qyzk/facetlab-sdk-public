@@ -16,7 +16,10 @@ Usage:
 from .client import FacetLabClient
 from .mockup import MockupClient
 from .product_tests import ProductTestsClient
+from .agent import AgentClient, AgentReply, Draft
+from .exceptions import AuthenticationError, FacetLabError, InsufficientFundsError, LimitError
 from .models import ExperimentResult, MockupResult
 
-__version__ = "0.2.0"
-__all__ = ["FacetLabClient", "ExperimentResult", "MockupResult", "ProductTestsClient", "MockupClient"]
+__version__ = "0.3.0"
+__all__ = ["FacetLabClient", "ExperimentResult", "MockupResult", "ProductTestsClient", "MockupClient", "AgentClient",
+           "AgentReply", "Draft", "FacetLabError", "AuthenticationError", "InsufficientFundsError", "LimitError"]

@@ -3,7 +3,7 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-**Test before you launch.** AI shoppers react to your product pages in hours, not 3 weeks.
+**Know which page sells before you launch.** AI shoppers react to your product pages and UI changes in hours, not 3 weeks.
 Results are an AI simulation for pre-testing ideas, not a sales forecast.
 
 ## Installation
@@ -12,13 +12,16 @@ Results are an AI simulation for pre-testing ideas, not a sales forecast.
 pip install git+https://github.com/qyzk/facetlab-sdk-public.git
 ```
 
-Version 0.2.0, Python 3.8+. (Not on PyPI yet.)
+Version 0.3.0, Python 3.8+. (Not on PyPI yet.) To upgrade: `pip install -U git+https://github.com/qyzk/facetlab-sdk-public.git`.
 
 ## Quick start
 
-1. Sign up at [qyzkdesign.com](https://qyzkdesign.com) and create an API key at
-   [qyzkdesign.com/dashboard/api-keys](https://qyzkdesign.com/dashboard/api-keys).
-2. Run a product page test (2–6 versions of a product page on TikTok Shop or Amazon in the US, UK or Asia):
+1. Sign up at [qyzkdesign.com](https://qyzkdesign.com) (we email you a code to verify your address) and create an
+   API key at [qyzkdesign.com/dashboard/api-keys](https://qyzkdesign.com/dashboard/api-keys). A key is shown only
+   once: if you didn't copy it, revoke it there and create a new one.
+2. Optional: add a card on [Billing](https://qyzkdesign.com/dashboard/billing) for a one-time $25 credit
+   (a $0 check, nothing is charged) and top up your balance. See [Billing](#billing) below.
+3. Run a product page test (2–6 versions of a product page on TikTok Shop or Amazon in the US, UK or Asia):
 
 ```python
 from facetlab import FacetLabClient
@@ -70,26 +73,89 @@ Each variant's AI shoppers see that variant's facts. The estimate then includes 
 warning: differences reflect the product, its price and its page together. Gaps that only some variants have are
 reported as `arms.<ID>.<field>` (e.g. `arms.B.product.material`). Credits and statistics are unchanged.
 
-Credits: 1 credit = 5 sessions × 1 persona × 1 variant, so a test costs
-`persona_count × variants × ceil(sessions_per_arm / 5)` credits (e.g. 25 personas × 3 variants × 5 sessions = 75 credits).
-The free plan includes 6 free tests in total (shared by the web app, the Assistant and the API) and allows at most
-50 personas and 5 sessions per variant per test (larger requests return `tier_limit`; no free tests left returns `free_tier_limit`).
-A test that fails before any persona finishes is refunded automatically; partially completed failed tests are charged.
-
-
-Errors raise `facetlab.exceptions.FacetLabError` (with `.code`, e.g. `tier_limit`, `free_tier_limit`, `audience_too_small`).
+Product page tests use credits for their monthly cap: `persona_count × variants × ceil(sessions_per_arm / 5)`
+(e.g. 25 personas × 3 variants × 5 sessions = 75 credits). Without a plan a test allows at most 50 personas and 5
+sessions per variant (larger requests return `tier_limit`).
 
 Full API reference: [qyzkdesign.com/docs](https://qyzkdesign.com/docs).
 
-## UI A/B tests and mockups
+## UI A/B tests
 
-UI A/B tests (control vs treatment screenshots) and AI mockup generation currently run in the web app and the
-Assistant at [qyzkdesign.com](https://qyzkdesign.com). The SDK's older `run_experiment()` and `generate_mockups()`
-calls do not accept API keys created in the current dashboard; use the web app for these for now.
+Compare two screenshots of the same page (control and treatment), such as a sign-up or subscribe page:
 
-## Pricing
+```python
+result = client.run_experiment(
+    control_image="control.png", treatment_image="treatment.png",
+    locale="usa",                      # "usa", "europe" or "asia"
+    persona_count=25,                  # up to 25 without a plan, 200 on Base, 500 on Pro (larger is lowered)
+    context="Sign-up page: bigger free-trial banner",
+    positive_decision="Start the free trial", negative_decision="Leave the page",
+)
+print(result.winner, result.lift, result.confidence)
+```
 
-See [qyzkdesign.com/pricing](https://qyzkdesign.com/pricing). The free plan includes 6 free tests in total.
+`run_experiment` checks your free tests and balance first, uploads both screenshots, starts the test and waits for the
+result (`timeout=1800` seconds by default). Use `client.get_experiment(job_id)` and `client.wait_experiment(job_id)`
+to follow a test yourself. Screenshots are PNG, JPEG or WebP; both together must stay under about 3 MB.
+
+## Billing
+
+Every test you start through the API is counted and paid like one started in the app:
+
+1. **Free tests first:** 2 free tests in total, shared by the web app, the Assistant and the API.
+2. **Then your prepaid balance**, charged when the test starts, per persona:
+   - without a plan: $1.99 for the first 10 tests a month, then $2.99 (up to 50 tests a month);
+   - Base: $1.00 for the first 10 tests of each billing period, then $1.50 (up to 50);
+   - Pro: $0.75 for the first 50, then $1.00 (up to 1,000).
+
+   Product page tests count `personas × (variants ÷ 2) × (sessions ÷ 5)` persona units.
+
+Add a card on [Billing](https://qyzkdesign.com/dashboard/billing) for a one-time $25 credit, and top up with $50,
+$100 or $250. A test that fails before any persona finishes is refunded to your balance.
+
+```python
+acct = client.account()
+print(acct["free_tests"], acct["balance"], acct["next_test_rate"])   # e.g. {'remaining': 0, ...} 25.0 1.99
+```
+
+`run_experiment()` and `product_tests.create()` check this before uploading anything (pass `check_balance=False` to
+skip). If the balance does not cover the test, they raise `InsufficientFundsError` with `.required` and `.balance` in
+US dollars; the server checks the exact cost again at start and answers HTTP 402 `insufficient_funds`.
+
+## The Assistant over the API
+
+Describe a test in plain language; the Assistant asks for anything missing, drafts the plan and tells you what to
+upload. Nothing runs until you start it. See [examples/assistant.py](./examples/assistant.py).
+
+```python
+conv = client.agent.start_conversation()
+reply = client.agent.send(conv, "Compare my original shoe cabinet page with a benefit-led version on TikTok Shop US. "
+                                "25 personas, the price is $37.69 with free shipping.")
+print(reply.text)
+draft = reply.draft()                  # None until the Assistant has everything it needs; answer it with send()
+if draft:
+    print(draft.workflow, draft.arms, draft.plan)        # e.g. product_test ['A', 'B'] {...}
+    client.agent.upload(conv, draft, {"A": "original.png", "B": "benefit.png"})
+    client.agent.start(draft)          # paid like any test (free tests, then balance)
+```
+
+For a UI A/B test the draft's images are `{"control": ..., "treatment": ...}`. When the Assistant asks which kind of
+test you mean, answer with `client.agent.send(conv, "", workflow="product_test")` (or `"ui_ab_test"`). Follow a
+started test with `client.product_tests.wait(id)` or `client.wait_experiment(id)`, or ask the Assistant to explain the
+results.
+
+## Errors
+
+All errors are `facetlab.FacetLabError` subclasses with `.code`, `.message` and `.details`:
+
+| Exception | When |
+|---|---|
+| `InsufficientFundsError` | The balance does not cover the test (`insufficient_funds`, HTTP 402) |
+| `LimitError` | `free_tier_limit`, `plan_limit` (tests per period) or `quota_exceeded` |
+| `AuthenticationError` | Missing, invalid or revoked API key (HTTP 401) |
+| `FacetLabError` | Anything else, e.g. `tier_limit`, `audience_too_small`, `images_missing` |
+
+AI mockup generation (`generate_mockups()`) still runs in the web app only.
 
 ## Support
 

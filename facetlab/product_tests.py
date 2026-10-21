@@ -8,7 +8,9 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 import requests
 
-from .exceptions import FacetLabError
+from ._http import check
+
+from .exceptions import FacetLabError, InsufficientFundsError
 
 TERMINAL = {'completed', 'failed', 'cancelled'}
 TIMEOUT = (10, 60)           # (connect, read) seconds for API calls
@@ -161,26 +163,14 @@ def _check_no_extra_images(arm_ids, images: Dict[str, str]) -> None:
 
 
 class ProductTestsClient:
-    def __init__(self, session: requests.Session, base_url: str, put: Optional[Callable] = None):
+    def __init__(self, session: requests.Session, base_url: str, put: Optional[Callable] = None,
+                 account: Optional[Callable] = None):
         self._s, self._base = session, base_url.rstrip('/')
+        self._account = account
         self._put = put or requests.put   # presigned S3 PUTs must not carry the API key
 
     def _check(self, response) -> Dict[str, Any]:
-        status = getattr(response, 'status_code', None)
-        try:
-            body = response.json()
-        except ValueError:
-            body = None
-        if not response.ok:
-            err = body.get('error') if isinstance(body, dict) else None
-            if isinstance(err, dict):
-                raise FacetLabError(err.get('message') or f'HTTP {status}', code=err.get('code') or f'http_{status}',
-                                    details=err)
-            raise FacetLabError(f'HTTP {status}', code=f'http_{status}', details={'status': status})
-        if body is None:
-            raise FacetLabError(f'HTTP {status}: response was not valid JSON', code=f'http_{status}',
-                                details={'status': status})
-        return body
+        return check(response)
 
     def markets_audience(self, market: str) -> Dict[str, Any]:
         """Filter menu (field -> value -> count) for a market's persona pool."""
@@ -190,9 +180,18 @@ class ProductTestsClient:
         """Readiness, data gaps, eligible personas, credits and ETA - creates nothing."""
         return self._check(self._s.post(f'{self._base}/product-tests/estimate', json=spec, timeout=TIMEOUT))
 
-    def create(self, spec: Dict[str, Any], images: Dict[str, str], idempotency_key: Optional[str] = None) -> Dict[str, Any]:
-        """Create, upload one image per arm ({'A': 'control.png', 'B': 'treatment.png', ...}) and start."""
+    def create(self, spec: Dict[str, Any], images: Dict[str, str], idempotency_key: Optional[str] = None,
+               check_balance: bool = True) -> Dict[str, Any]:
+        """Create, upload one image per arm ({'A': 'control.png', 'B': 'treatment.png', ...}) and start.
+
+        With check_balance (default), free tests and the prepaid balance are checked before anything is created:
+        InsufficientFundsError when the test cannot be paid. The start is checked again on the server.
+        """
         ids = _arm_ids(spec.get('arms') or [])
+        if check_balance and self._account is not None:
+            personas = spec.get('persona_count', 25)
+            units = personas * (len(spec.get('arms') or []) / 2) * (spec.get('sessions_per_arm', 5) / 5)
+            self._check_funds(units)
         _check_no_extra_images(ids, images)
         spec = {**spec, 'arms': [{**arm, 'content_type': _validate_image(arm['id'], images.get(arm['id']))}
                                  for arm in spec['arms']]}
@@ -200,6 +199,17 @@ class ProductTestsClient:
                                            headers={'Idempotency-Key': idempotency_key or uuid.uuid4().hex},
                                            timeout=TIMEOUT))
         return self._upload_and_start(created, images)
+
+    def _check_funds(self, units: float) -> None:
+        acct = self._account()
+        free = acct.get('free_tests') or {}
+        if free.get('remaining', 0) > 0 or acct.get('balance') is None:
+            return
+        cost = round(max(1, -(-units // 1)) * acct['next_test_rate'], 2)
+        if acct['balance'] < cost:
+            raise InsufficientFundsError(
+                f"Insufficient funds: this test costs about ${cost:.2f} and your balance is ${acct['balance']:.2f}. "
+                'Top up at https://qyzkdesign.com/dashboard/billing', required=cost, balance=acct['balance'])
 
     def clone(self, test_id: str, overrides: Dict[str, Any], images: Optional[Dict[str, str]] = None,
               idempotency_key: Optional[str] = None) -> Dict[str, Any]:

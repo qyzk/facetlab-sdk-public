@@ -9,16 +9,16 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name="facetlab",
-    version="0.2.0",
+    version="0.3.0",
     author="FacetLab",
-    author_email="support@qyzkdesign.com",
+    author_email="qyzkai@gmail.com",
     description="AI-powered pre-launch A/B testing and mockup generation",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/qyzk/facetlab-sdk-public",
     project_urls={
-        "Documentation": "https://qyzkdesign.com/docs/sdk",
-        "Bug Tracker": "https://github.com/qyzk/facetlab-sdk/issues",
+        "Documentation": "https://qyzkdesign.com/docs",
+        "Bug Tracker": "https://github.com/qyzk/facetlab-sdk-public/issues",
     },
     packages=find_packages(),
     classifiers=[
