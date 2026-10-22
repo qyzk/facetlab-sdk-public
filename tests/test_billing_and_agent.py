@@ -54,6 +54,46 @@ def test_check_funds_before_uploading():
     client.check_funds(25)                # a free test covers it
 
 
+def test_free_tests_cover_only_free_size_ui_tests():
+    client = FacetLabClient(api_key="fl_test")
+    client.session = MagicMock()
+    client.session.get.return_value = resp(200, account(25, remaining=2))
+    client.check_funds(25)                # free-size: a free test covers it
+    with pytest.raises(InsufficientFundsError) as e:
+        client.check_funds(100)           # larger than 25: paid from the balance, 100 x $1.99 > $25
+    assert e.value.required == 199.0
+    client.session.get.return_value = resp(200, account(500, remaining=2))
+    assert client.check_funds(100)["balance"] == 500
+    client.session.get.return_value = resp(200, account(0, remaining=2))
+    client.check_funds(10, fits_free_test=True)
+    with pytest.raises(InsufficientFundsError):
+        client.check_funds(10, fits_free_test=False)
+
+
+def product_spec(personas, sessions):
+    return {"name": "t", "market": "tiktok_us", "persona_count": personas, "sessions_per_arm": sessions,
+            "arms": [{"id": "A"}, {"id": "B"}]}
+
+
+@pytest.mark.parametrize("personas,sessions", [(51, 5), (50, 6), (200, 10)])
+def test_free_tests_do_not_cover_larger_product_tests(personas, sessions):
+    client = FacetLabClient(api_key="fl_test")
+    client.session = MagicMock()
+    client.session.get.return_value = resp(200, account(0, remaining=2))
+    with pytest.raises(InsufficientFundsError):
+        client.product_tests.create(product_spec(personas, sessions), images={})
+
+
+def test_free_tests_cover_free_size_product_tests():
+    client = FacetLabClient(api_key="fl_test")
+    client.session = MagicMock()
+    client.session.get.return_value = resp(200, account(0, remaining=1))
+    # Passes the funds check (a free test covers 50 personas x 5 sessions), then stops at the missing images.
+    with pytest.raises(FacetLabError) as e:
+        client.product_tests.create(product_spec(50, 5), images={})
+    assert not isinstance(e.value, InsufficientFundsError)
+
+
 def sse(*events):
     return [f"data: {json.dumps(e)}" for e in events]
 

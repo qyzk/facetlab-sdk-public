@@ -17,7 +17,8 @@ result = client.run_experiment(
     treatment_image="screenshots/treatment.png",  # Path to treatment image
     context="E-commerce checkout page redesign - testing new CTA button",
     locale="usa",        # "usa", "europe", or "asia"
-    persona_count=25,    # up to 25 without a plan, 200 on Base, 500 on Pro
+    persona_count=25,    # up to 25 on the free plan, 200 on Base or pay-as-you-go, 500 on Pro
+                         # (a larger persona_count is lowered to the limit)
     scenario="ui_change" # ui_change, price, promo, content, ranking, cart
 )
 

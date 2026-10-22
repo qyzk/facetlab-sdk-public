@@ -74,8 +74,8 @@ warning: differences reflect the product, its price and its page together. Gaps 
 reported as `arms.<ID>.<field>` (e.g. `arms.B.product.material`). Credits and statistics are unchanged.
 
 Product page tests use credits for their monthly cap: `persona_count × variants × ceil(sessions_per_arm / 5)`
-(e.g. 25 personas × 3 variants × 5 sessions = 75 credits). Without a plan a test allows at most 50 personas and 5
-sessions per variant (larger requests return `tier_limit`).
+(e.g. 25 personas × 3 variants × 5 sessions = 75 credits). A free test covers up to 50 personas and 5 sessions per
+variant; larger tests (up to 200 personas and 10 sessions) are paid from your balance.
 
 Full API reference: [qyzkdesign.com/docs](https://qyzkdesign.com/docs).
 
@@ -87,7 +87,8 @@ Compare two screenshots of the same page (control and treatment), such as a sign
 result = client.run_experiment(
     control_image="control.png", treatment_image="treatment.png",
     locale="usa",                      # "usa", "europe" or "asia"
-    persona_count=25,                  # up to 25 without a plan, 200 on Base, 500 on Pro (larger is lowered)
+    persona_count=25,                  # up to 25 on the free plan, 200 on Base or pay-as-you-go, 500 on Pro
+                                       # (a larger persona_count is lowered to the limit)
     context="Sign-up page: bigger free-trial banner",
     positive_decision="Start the free trial", negative_decision="Leave the page",
 )
@@ -102,8 +103,11 @@ to follow a test yourself. Screenshots are PNG, JPEG or WebP; both together must
 
 Every test you start through the API is counted and paid like one started in the app:
 
-1. **Free tests first:** 2 free tests in total, shared by the web app, the Assistant and the API.
-2. **Then your prepaid balance**, charged when the test starts, per persona:
+1. **Free tests first:** 2 free tests in total, shared by the web app, the Assistant and the API. A free test covers
+   only a free-size test: a UI A/B test with up to 25 personas, or a product page test with up to 50 personas and 5
+   sessions per variant. Base and Pro subscribers don't use free tests.
+2. **Then your prepaid balance**, charged when the test starts, per persona (also for any test larger than the free
+   size, even while free tests remain):
    - without a plan: $1.99 for the first 10 tests a month, then $2.99 (up to 50 tests a month);
    - Base: $1.00 for the first 10 tests of each billing period, then $1.50 (up to 50);
    - Pro: $0.75 for the first 50, then $1.00 (up to 1,000).

@@ -15,6 +15,8 @@ from .exceptions import FacetLabError, InsufficientFundsError
 TERMINAL = {'completed', 'failed', 'cancelled'}
 TIMEOUT = (10, 60)           # (connect, read) seconds for API calls
 UPLOAD_TIMEOUT = (10, 300)   # image uploads to presigned S3 URLs
+# A free test covers a product page test up to this size; larger ones are paid from the balance.
+FREE_TEST_LIMITS = {'persona_count': 50, 'sessions_per_arm': 5}
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 # Per-format pixel caps, as in docker-pipeline shared/image_fit.py (the pipeline rejects larger images).
 MAX_PIXELS_JPEG = 80_000_000
@@ -186,13 +188,17 @@ class ProductTestsClient:
         """Create, upload one image per arm ({'A': 'control.png', 'B': 'treatment.png', ...}) and start.
 
         With check_balance (default), free tests and the prepaid balance are checked before anything is created:
-        InsufficientFundsError when the test cannot be paid. The start is checked again on the server.
+        InsufficientFundsError when the test cannot be paid. A free test covers only a free-size test (up to 50
+        personas and 5 sessions per variant); a larger test is paid from the balance even while free tests remain.
+        The start is checked again on the server.
         """
         ids = _arm_ids(spec.get('arms') or [])
         if check_balance and self._account is not None:
             personas = spec.get('persona_count', 25)
-            units = personas * (len(spec.get('arms') or []) / 2) * (spec.get('sessions_per_arm', 5) / 5)
-            self._check_funds(units)
+            sessions = spec.get('sessions_per_arm', 5)
+            units = personas * (len(spec.get('arms') or []) / 2) * (sessions / 5)
+            self._check_funds(units, fits_free_test=personas <= FREE_TEST_LIMITS['persona_count']
+                              and sessions <= FREE_TEST_LIMITS['sessions_per_arm'])
         _check_no_extra_images(ids, images)
         spec = {**spec, 'arms': [{**arm, 'content_type': _validate_image(arm['id'], images.get(arm['id']))}
                                  for arm in spec['arms']]}
@@ -201,10 +207,11 @@ class ProductTestsClient:
                                            timeout=TIMEOUT))
         return self._upload_and_start(created, images)
 
-    def _check_funds(self, units: float) -> None:
+    def _check_funds(self, units: float, fits_free_test: bool) -> None:
+        """A free test (if any is left) covers a free-size test; anything else must be covered by the balance."""
         acct = self._account()
         free = acct.get('free_tests') or {}
-        if free.get('remaining', 0) > 0 or acct.get('balance') is None:
+        if (fits_free_test and free.get('remaining', 0) > 0) or acct.get('balance') is None:
             return
         cost = round(max(1, -(-units // 1)) * acct['next_test_rate'], 2)
         if acct['balance'] < cost:

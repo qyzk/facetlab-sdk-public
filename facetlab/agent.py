@@ -1,6 +1,7 @@
 """
 The FacetLab Assistant over the API: describe a test in plain language, the Assistant sets it up as a draft, you upload
-the screenshots and start it. Tests are paid like any other (free tests first, then your prepaid balance).
+the screenshots and start it. Tests are paid like any other (free tests first, then your prepaid balance;
+a free test covers only a free-size test).
 
     conv = client.agent.start_conversation()
     reply = client.agent.send(conv, "Compare my original and benefit-led shoe cabinet pages on TikTok Shop US")
