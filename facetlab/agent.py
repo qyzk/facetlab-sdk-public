@@ -12,7 +12,6 @@ the screenshots and start it. Tests are paid like any other (free tests first, t
 """
 
 import json
-import mimetypes
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
@@ -20,6 +19,7 @@ from urllib.parse import quote
 import requests
 
 from ._http import check
+from .product_tests import _validate_image
 from .exceptions import FacetLabError
 
 TIMEOUT = 30
@@ -112,10 +112,8 @@ class AgentClient:
         missing = [a for a in draft.arms if a not in images]
         if missing:
             raise FacetLabError(f"Images missing for: {', '.join(missing)}", code="invalid_image")
-        types = {}
-        for key in draft.arms:
-            ctype = mimetypes.guess_type(images[key])[0] or "image/png"
-            types[key] = "image/jpeg" if ctype == "image/jpg" else ctype
+        # Same local checks as product tests: PNG, JPEG or WebP from the file contents, at most 5 MB, pixel limits.
+        types = {key: _validate_image(key, images[key]) for key in draft.arms}
         urls = check(self._s.post(f"{self._conv(conversation_id)}/uploads", timeout=TIMEOUT,
                                   json={"draft_id": draft.draft_id, "workflow": draft.workflow, "content_types": types}))
         for key, target in urls["upload_urls"].items():

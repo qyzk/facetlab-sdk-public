@@ -25,6 +25,9 @@ def check(response) -> Dict[str, Any]:
     else:
         code = body.get("code") if isinstance(body, dict) else None
         message, details = (err if isinstance(err, str) else None), (body.get("details") if isinstance(body, dict) else None) or {}
+    if status == 413:
+        raise FacetLabError("The request is too large (the server accepts about 4.5 MB). Compress or resize the images: "
+                            "for UI A/B tests both screenshots together must stay under about 3 MB.", code="payload_too_large")
     code = code or f"http_{status}"
     message = message or f"HTTP {status}"
     if status == 401 or code == "unauthorized":

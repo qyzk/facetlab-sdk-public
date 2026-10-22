@@ -153,7 +153,7 @@ All errors are `facetlab.FacetLabError` subclasses with `.code`, `.message` and 
 | `InsufficientFundsError` | The balance does not cover the test (`insufficient_funds`, HTTP 402) |
 | `LimitError` | `free_tier_limit`, `plan_limit` (tests per period) or `quota_exceeded` |
 | `AuthenticationError` | Missing, invalid or revoked API key (HTTP 401) |
-| `FacetLabError` | Anything else, e.g. `tier_limit`, `audience_too_small`, `images_missing` |
+| `FacetLabError` | Anything else, e.g. `invalid_image` (also images over 5 MB), `image_too_large` (UI A/B screenshots over about 3 MB together), `payload_too_large`, `tier_limit`, `audience_too_small`, `images_missing` |
 
 AI mockup generation (`generate_mockups()`) still runs in the web app only.
 

@@ -9,7 +9,13 @@ from typing import Optional, Dict, Any
 from urllib.parse import urlsplit
 import requests
 
+import os
+
 from ._http import check
+from .product_tests import _validate_image
+
+# The request carries both screenshots as base64 (a third larger) and must stay under the server's 4.5 MB body limit.
+MAX_UI_REQUEST_IMAGE_BYTES = 3_200_000
 from .exceptions import FacetLabError, InsufficientFundsError
 from .models import ExperimentResult, MockupResult
 
@@ -141,6 +147,16 @@ class FacetLabClient:
         if locale not in ["usa", "europe", "asia"]:
             raise ValueError("locale must be 'usa', 'europe', or 'asia'")
         
+        # Image checks first (type, 5 MB each, the request size), so nothing is sent that the server would refuse.
+        for path in (control_image, treatment_image):
+            _validate_image("control" if path == control_image else "treatment", path)
+        total = sum(os.path.getsize(p) for p in (control_image, treatment_image))
+        if total > MAX_UI_REQUEST_IMAGE_BYTES:
+            raise FacetLabError(
+                f"The two screenshots are {total / 1e6:.1f} MB together; UI A/B tests over the API accept about "
+                f"{MAX_UI_REQUEST_IMAGE_BYTES / 1e6:.0f} MB in total. Compress or resize them (JPEG or WebP usually helps), "
+                "or run the test through client.agent, which uploads each image separately (up to 5 MB each).",
+                code="image_too_large", details={"bytes": total})
         if check_balance:
             self.check_funds(persona_count)
 

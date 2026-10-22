@@ -80,8 +80,9 @@ def test_agent_send_collects_the_streamed_reply_and_its_draft():
 def test_agent_uploads_then_starts_each_kind_of_draft(tmp_path):
     from facetlab.agent import Draft
     s, put = MagicMock(), MagicMock(return_value=resp(200, None))
+    from test_product_tests import _jpeg, _png
     a, b = tmp_path / "a.png", tmp_path / "b.jpg"
-    a.write_bytes(b"png"); b.write_bytes(b"jpg")
+    a.write_bytes(_png(10, 10)); b.write_bytes(_jpeg(10, 10))
     s.post.side_effect = [resp(200, {"upload_urls": {"A": {"url": "https://s3/a", "content_type": "image/png"},
                                                      "B": {"url": "https://s3/b", "content_type": "image/jpeg"}}}),
                           resp(200, {"id": "pt_1", "status": "queued"}),
@@ -98,3 +99,34 @@ def test_agent_uploads_then_starts_each_kind_of_draft(tmp_path):
     assert s.post.call_args_list[2][0][0] == "https://qyzkdesign.com/api/sdk/experiments/exp-1/start"
     with pytest.raises(FacetLabError):
         agent.upload("conv#abc", draft, {"A": str(a)})
+
+
+def test_image_size_warnings_before_anything_is_sent(tmp_path):
+    from test_product_tests import _png
+    from facetlab.agent import Draft
+    big = tmp_path / "big.png"
+    big.write_bytes(_png(10, 10) + b"0" * 5_300_000)
+    small = tmp_path / "small.png"
+    small.write_bytes(_png(10, 10))
+    s = MagicMock()
+    agent = AgentClient(s, "https://qyzkdesign.com", put=MagicMock())
+    with pytest.raises(FacetLabError) as e:
+        agent.upload("conv#abc", Draft("ui_ab_test", "exp-1", ["control", "treatment"]),
+                     {"control": str(big), "treatment": str(small)})
+    assert e.value.code == "invalid_image" and "5 MB limit" in e.value.message
+    assert not s.post.called
+
+    client = FacetLabClient(api_key="fl_test")
+    client.session = MagicMock()
+    half = tmp_path / "half.png"
+    half.write_bytes(_png(10, 10) + b"0" * 1_700_000)
+    with pytest.raises(FacetLabError) as e:
+        client.run_experiment(str(half), str(half))      # 3.4 MB together: over the request limit
+    assert e.value.code == "image_too_large" and "client.agent" in e.value.message
+    assert not client.session.post.called
+
+
+def test_payload_too_large_has_a_clear_message():
+    with pytest.raises(FacetLabError) as e:
+        check(resp(413, None))
+    assert e.value.code == "payload_too_large"

@@ -128,7 +128,8 @@ def _validate_image(arm_id: str, path: Optional[str]) -> str:
     except OSError as e:
         raise FacetLabError(f'Arm {arm_id}: cannot read image {path}: {e}', code='invalid_image')
     if size > MAX_IMAGE_BYTES:
-        raise FacetLabError(f'Arm {arm_id}: image exceeds 5 MB', code='invalid_image')
+        raise FacetLabError(f'Arm {arm_id}: image is {size / 1e6:.1f} MB, over the 5 MB limit. Compress or resize it '
+                            '(JPEG or WebP usually helps).', code='invalid_image', details={'bytes': size})
     try:
         info = _image_info(path)
     except OSError as e:
