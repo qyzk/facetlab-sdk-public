@@ -74,8 +74,9 @@ warning: differences reflect the product, its price and its page together. Gaps 
 reported as `arms.<ID>.<field>` (e.g. `arms.B.product.material`). Credits and statistics are unchanged.
 
 Product page tests use credits for their monthly cap: `persona_count × variants × ceil(sessions_per_arm / 5)`
-(e.g. 25 personas × 3 variants × 5 sessions = 75 credits). A free test covers up to 50 personas and 5 sessions per
-variant; larger tests (up to 200 personas and 10 sessions) are paid from your balance.
+(e.g. 25 personas × 3 variants × 5 sessions = 75 credits). A free test covers up to 100 personas, 2 variants and 5
+sessions per variant; larger tests are paid from your balance (up to 100 personas per test without a plan, 500 on
+Base, 2,000 on Pro; 3–10 sessions per variant).
 
 Full API reference: [qyzkdesign.com/docs](https://qyzkdesign.com/docs).
 
@@ -87,7 +88,7 @@ Compare two screenshots of the same page (control and treatment), such as a sign
 result = client.run_experiment(
     control_image="control.png", treatment_image="treatment.png",
     locale="usa",                      # "usa", "europe" or "asia"
-    persona_count=25,                  # up to 25 on the free plan, 200 on Base or pay-as-you-go, 500 on Pro
+    persona_count=25,                  # up to 100 without a plan, 500 on Base, 2,000 on Pro
                                        # (a larger persona_count is lowered to the limit)
     context="Sign-up page: bigger free-trial banner",
     positive_decision="Start the free trial", negative_decision="Leave the page",
@@ -104,22 +105,22 @@ to follow a test yourself. Screenshots are PNG, JPEG or WebP; both together must
 Every test you start through the API is counted and paid like one started in the app:
 
 1. **Free tests first:** 2 free tests in total, shared by the web app, the Assistant and the API. A free test covers
-   only a free-size test: a UI A/B test with up to 25 personas, or a product page test with up to 50 personas and 5
-   sessions per variant. Base and Pro subscribers don't use free tests.
-2. **Then your prepaid balance**, charged when the test starts, per persona (also for any test larger than the free
-   size, even while free tests remain):
-   - without a plan: $1.99 for the first 10 tests a month, then $2.99 (up to 50 tests a month);
-   - Base: $1.00 for the first 10 tests of each billing period, then $1.50 (up to 50);
-   - Pro: $0.75 for the first 50, then $1.00 (up to 1,000).
+   up to 100 personas, 2 variants and 5 sessions per variant. Base and Pro subscribers don't use free tests.
+2. **Then your prepaid balance**, charged when the test starts, **per persona per variant** (also for any test larger
+   than a free test covers, even while free tests remain):
+   - without a plan: $0.80 (up to 50 tests a month, up to 100 personas per test);
+   - Base: $0.50 for the first 10 tests of each billing period, then $0.55 (up to 50 tests, 500 personas per test);
+   - Pro: $0.35 for the first 50, then $0.40 (up to 1,000 tests, 2,000 personas per test).
 
-   Product page tests count `personas × (variants ÷ 2) × (sessions ÷ 5)` persona units.
+   A test costs `personas × variants × (sessions ÷ 5)` persona-variants × the rate. A UI A/B test has 2 variants
+   (control and treatment), so 100 personas = 200 persona-variants: $160 without a plan.
 
 Add a card on [Billing](https://qyzkdesign.com/dashboard/billing) for a one-time $25 credit, and top up with $50,
 $100 or $250. A test that fails before any persona finishes is refunded to your balance.
 
 ```python
 acct = client.account()
-print(acct["free_tests"], acct["balance"], acct["next_test_rate"])   # e.g. {'remaining': 0, ...} 25.0 1.99
+print(acct["free_tests"], acct["balance"], acct["next_test_rate"])   # e.g. {'remaining': 0, ...} 25.0 0.8
 ```
 
 `run_experiment()` and `product_tests.create()` check this before uploading anything (pass `check_balance=False` to

@@ -17,7 +17,9 @@ from .product_tests import _validate_image
 # The request carries both screenshots as base64 (a third larger) and must stay under the server's 4.5 MB body limit.
 MAX_UI_REQUEST_IMAGE_BYTES = 3_200_000
 # A free test covers a UI A/B test with up to this many personas; larger ones are paid from the balance.
-FREE_UI_PERSONAS = 25
+# A free test covers up to 100 personas, 2 variants and 5 sessions per variant (a UI A/B test has 2 variants).
+FREE_UI_PERSONAS = 100
+UI_VARIANTS = 2
 from .exceptions import FacetLabError, InsufficientFundsError
 from .models import ExperimentResult, MockupResult
 
@@ -82,22 +84,22 @@ class FacetLabClient:
         """Free tests left, prepaid balance (USD) and the per-persona rates of the current period.
 
         Example: {"plan": "pay_as_you_go", "free_tests": {"used": 1, "limit": 2, "remaining": 1},
-        "balance": 25.0, "rates": {"first_tests": 10, "first_rate": 1.99, "then_rate": 2.99, ...},
-        "next_test_rate": 1.99, ...}
+        "balance": 25.0, "rates": {"first_tests": 10, "first_rate": 0.8, "then_rate": 0.8, "unit": "persona_variant", ...},
+        "next_test_rate": 0.8, ...}   # $ per persona per variant
         """
         return check(self.session.get(f"{self._v1}/account", timeout=30))
 
     def check_funds(self, persona_units: float, fits_free_test: Optional[bool] = None) -> Dict[str, Any]:
         """Raises InsufficientFundsError before anything is uploaded when the next test cannot be paid.
 
-        A free test (if any is left) covers only a free-size test: a UI A/B test with up to 25 personas, or a product
-        page test with up to 50 personas and 5 sessions per variant. A larger test, or any test after the free ones,
-        costs persona units x the next test's rate and is paid from the balance. `fits_free_test` says whether the
-        test is free-size; by default it is a UI A/B test of `persona_units` personas. The server checks the exact
-        cost again when the test starts.
+        Tests are priced per persona per variant (5 sessions): `persona_units` = personas x variants x sessions / 5,
+        so a UI A/B test is personas x 2. A free test (if any is left) covers up to 100 personas, 2 variants and 5
+        sessions per variant; a larger test, or any test after the free ones, costs persona_units (rounded up) x the
+        next test's rate and is paid from the balance. `fits_free_test` says whether a free test covers it; by default
+        the units are read as a UI A/B test (personas x 2). The server checks the exact cost again at start.
         """
         if fits_free_test is None:
-            fits_free_test = persona_units <= FREE_UI_PERSONAS
+            fits_free_test = persona_units <= FREE_UI_PERSONAS * UI_VARIANTS
         acct = self.account()
         free = acct.get("free_tests") or {}
         if (fits_free_test and free.get("remaining", 0) > 0) or acct.get("balance") is None:
@@ -134,8 +136,8 @@ class FacetLabClient:
             control_image: Path to control image (PNG/JPG)
             treatment_image: Path to treatment image (PNG/JPG)
             locale: Region for personas - "usa", "europe", or "asia"
-            persona_count: Number of personas: up to 25 on the free plan, 200 on Base or pay-as-you-go,
-                500 on Pro (a larger persona_count is lowered to the limit). A free test covers up to 25.
+            persona_count: Number of personas: up to 100 without a plan, 500 on Base, 2,000 on Pro (a larger
+                persona_count is lowered to the limit). A free test covers up to 100.
             context: Description of the experiment
             scenario: Type of change - ui_change, price, promo, content, ranking, cart
             experiment_name: Optional name for the experiment
@@ -146,7 +148,7 @@ class FacetLabClient:
             poll_interval: Seconds between status checks (default: 15)
             timeout: Max seconds to wait (default: 1800)
             check_balance: Check free tests and balance first (raises InsufficientFundsError before uploading;
-                a free test covers only a test with up to 25 personas)
+                a free test covers only a test with up to 100 personas)
             
         Returns:
             ExperimentResult with winner, confidence, lift, segmentation, recommendations
@@ -166,7 +168,7 @@ class FacetLabClient:
                 "or run the test through client.agent, which uploads each image separately (up to 5 MB each).",
                 code="image_too_large", details={"bytes": total})
         if check_balance:
-            self.check_funds(persona_count)
+            self.check_funds(persona_count * UI_VARIANTS, fits_free_test=persona_count <= FREE_UI_PERSONAS)
 
         # Load and encode images
         control_b64 = self._load_image(control_image)

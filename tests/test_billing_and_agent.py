@@ -36,7 +36,7 @@ def test_check_maps_server_errors_to_typed_exceptions():
     assert e.value.code == "internal_error"
 
 
-def account(balance, remaining=0, rate=1.99):
+def account(balance, remaining=0, rate=0.80):
     return {"plan": "pay_as_you_go", "free_tests": {"used": 2, "limit": 2, "remaining": remaining}, "balance": balance,
             "next_test_rate": rate}
 
@@ -46,10 +46,10 @@ def test_check_funds_before_uploading():
     client.session = MagicMock()
     client.session.get.return_value = resp(200, account(25))
     with pytest.raises(InsufficientFundsError) as e:
-        client.check_funds(25)            # 25 x $1.99 = $49.75 > $25
-    assert e.value.required == 49.75
+        client.check_funds(50)            # 25 personas x 2 variants x $0.80 = $40 > $25
+    assert e.value.required == 40.0
     client.session.get.return_value = resp(200, account(50))
-    assert client.check_funds(25)["balance"] == 50
+    assert client.check_funds(50)["balance"] == 50
     client.session.get.return_value = resp(200, account(0, remaining=1))
     client.check_funds(25)                # a free test covers it
 
@@ -58,39 +58,48 @@ def test_free_tests_cover_only_free_size_ui_tests():
     client = FacetLabClient(api_key="fl_test")
     client.session = MagicMock()
     client.session.get.return_value = resp(200, account(25, remaining=2))
-    client.check_funds(25)                # free-size: a free test covers it
+    client.check_funds(200)               # 100 personas x 2 variants: a free test covers it
     with pytest.raises(InsufficientFundsError) as e:
-        client.check_funds(100)           # larger than 25: paid from the balance, 100 x $1.99 > $25
-    assert e.value.required == 199.0
+        client.check_funds(400)           # 200 personas x 2 variants: paid, 400 x $0.80 = $320 > $25
+    assert e.value.required == 320.0
     client.session.get.return_value = resp(200, account(500, remaining=2))
-    assert client.check_funds(100)["balance"] == 500
+    assert client.check_funds(400)["balance"] == 500
     client.session.get.return_value = resp(200, account(0, remaining=2))
     client.check_funds(10, fits_free_test=True)
     with pytest.raises(InsufficientFundsError):
         client.check_funds(10, fits_free_test=False)
 
 
-def product_spec(personas, sessions):
+def product_spec(personas, sessions, variants=2):
     return {"name": "t", "market": "tiktok_us", "persona_count": personas, "sessions_per_arm": sessions,
-            "arms": [{"id": "A"}, {"id": "B"}]}
+            "arms": [{"id": chr(65 + i)} for i in range(variants)]}
 
 
-@pytest.mark.parametrize("personas,sessions", [(51, 5), (50, 6), (200, 10)])
-def test_free_tests_do_not_cover_larger_product_tests(personas, sessions):
+@pytest.mark.parametrize("personas,sessions,variants", [(101, 5, 2), (100, 6, 2), (50, 5, 3), (200, 10, 2)])
+def test_free_tests_do_not_cover_larger_product_tests(personas, sessions, variants):
     client = FacetLabClient(api_key="fl_test")
     client.session = MagicMock()
     client.session.get.return_value = resp(200, account(0, remaining=2))
     with pytest.raises(InsufficientFundsError):
-        client.product_tests.create(product_spec(personas, sessions), images={})
+        client.product_tests.create(product_spec(personas, sessions, variants), images={})
+
+
+def test_product_cost_is_per_persona_per_variant():
+    client = FacetLabClient(api_key="fl_test")
+    client.session = MagicMock()
+    client.session.get.return_value = resp(200, account(10, remaining=0, rate=0.50))
+    with pytest.raises(InsufficientFundsError) as e:
+        client.product_tests.create(product_spec(200, 5, 3), images={})
+    assert e.value.required == 300.0   # 200 personas x 3 variants x $0.50
 
 
 def test_free_tests_cover_free_size_product_tests():
     client = FacetLabClient(api_key="fl_test")
     client.session = MagicMock()
     client.session.get.return_value = resp(200, account(0, remaining=1))
-    # Passes the funds check (a free test covers 50 personas x 5 sessions), then stops at the missing images.
+    # Passes the funds check (a free test covers 100 personas, 2 variants, 5 sessions), then stops at the missing images.
     with pytest.raises(FacetLabError) as e:
-        client.product_tests.create(product_spec(50, 5), images={})
+        client.product_tests.create(product_spec(100, 5), images={})
     assert not isinstance(e.value, InsufficientFundsError)
 
 
