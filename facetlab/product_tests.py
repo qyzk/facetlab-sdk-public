@@ -4,7 +4,7 @@ import os
 import struct
 import time
 import uuid
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
 
@@ -179,6 +179,33 @@ class ProductTestsClient:
     def markets_audience(self, market: str) -> Dict[str, Any]:
         """Filter menu (field -> value -> count) for a market's persona pool."""
         return self._check(self._s.get(f'{self._base}/product-tests/audience', params={'market': market}, timeout=TIMEOUT))
+
+    def extract_facts(self, screenshots: Optional[List[str]] = None, text: Optional[str] = None,
+                      market: Optional[str] = None) -> Dict[str, Any]:
+        """Reads product facts from up to 2 listing screenshots and/or pasted listing text, for you to check.
+
+        Returns {"facts": {name, variant, use, current_price, dimensions, material, key_features, shipping}, "notes": [...]}.
+        Facts the listing does not show are None; nothing is guessed. Use them for the spec's `product` and `pricing`
+        (or an arm's) after checking them. Screenshots together must stay under about 3 MB.
+        """
+        import base64
+        images = []
+        total = 0
+        for i, path in enumerate(screenshots or []):
+            content_type = _validate_image(f'screenshot {i + 1}', path)
+            with open(path, 'rb') as f:
+                data = f.read()
+            total += len(data)
+            images.append({'content_type': content_type, 'data': base64.b64encode(data).decode()})
+        if total > 3 * 1024 * 1024:
+            raise FacetLabError('Screenshots are too large together; use under 3 MB in total', code='payload_too_large',
+                                details={'bytes': total})
+        if not images and not (text or '').strip():
+            raise FacetLabError('Give at least one screenshot or the listing text', code='invalid_input')
+        body: Dict[str, Any] = {'images': images, 'text': text or ''}
+        if market:
+            body['market'] = market
+        return self._check(self._s.post(f'{self._base}/product-tests/extract', json=body, timeout=120))
 
     def estimate(self, spec: Dict[str, Any]) -> Dict[str, Any]:
         """Readiness, data gaps, eligible personas, credits and ETA - creates nothing."""

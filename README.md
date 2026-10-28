@@ -78,6 +78,16 @@ Product page tests use credits for their monthly cap: `persona_count × variants
 sessions per variant; larger tests are paid from your balance (up to 100 personas per test without a plan, 500 on
 Base, 2,000 on Pro; 3–10 sessions per variant).
 
+### Fill product facts from a listing
+
+Read the facts from up to 2 listing screenshots and/or the pasted listing text, then check them before you use them in
+the spec. Nothing is guessed: facts the listing does not show come back as `None`.
+
+```python
+facts = client.product_tests.extract_facts(["listing.png"], text=open("listing.txt").read(), market="tiktok_us")
+print(facts["facts"], facts["notes"])   # name, variant, use, current_price, dimensions, material, key_features, shipping
+```
+
 Full API reference: [qyzkdesign.com/docs](https://qyzkdesign.com/docs).
 
 ## UI A/B tests

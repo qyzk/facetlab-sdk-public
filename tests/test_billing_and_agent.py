@@ -179,3 +179,22 @@ def test_payload_too_large_has_a_clear_message():
     with pytest.raises(FacetLabError) as e:
         check(resp(413, None))
     assert e.value.code == "payload_too_large"
+
+
+def test_extract_facts_sends_screenshots_and_text(tmp_path):
+    import base64
+    from PIL import Image
+    png = tmp_path / "listing.png"
+    Image.new("RGB", (40, 30), "white").save(png)
+    client = FacetLabClient(api_key="fl_test")
+    client.session = MagicMock()
+    client.product_tests._s = client.session
+    client.session.post.return_value = resp(200, {"facts": {"name": "Cabinet"}, "notes": []})
+    out = client.product_tests.extract_facts([str(png)], text="Free shipping", market="tiktok_us")
+    assert out["facts"]["name"] == "Cabinet"
+    url, kwargs = client.session.post.call_args[0][0], client.session.post.call_args[1]
+    assert url.endswith("/product-tests/extract")
+    assert kwargs["json"]["market"] == "tiktok_us" and kwargs["json"]["text"] == "Free shipping"
+    assert base64.b64decode(kwargs["json"]["images"][0]["data"]).startswith(b"\x89PNG")
+    with pytest.raises(FacetLabError):
+        client.product_tests.extract_facts()
