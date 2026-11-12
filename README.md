@@ -21,7 +21,7 @@ Version 0.3.0, Python 3.8+. (Not on PyPI yet.) To upgrade: `pip install -U git+h
    once: if you didn't copy it, revoke it there and create a new one.
 2. Optional: add a card on [Billing](https://qyzkdesign.com/dashboard/billing) for a one-time $25 credit
    (a $0 check, nothing is charged) and top up your balance. See [Billing](#billing) below.
-3. Run a product page test (2–6 versions of a product page on TikTok Shop or Amazon in the US, UK or Asia):
+3. Run a product page test (2–6 versions of a product page on TikTok Shop, Amazon, Temu, Shein, Walmart, Shopee, Etsy, your own site or another platform, in the US, UK or Asia):
 
 ```python
 from facetlab import FacetLabClient
@@ -45,6 +45,14 @@ print(done["results"]["narrative"]["en"]["headline"])
 
 Images must be PNG, JPEG or WebP (checked from the file contents), up to 5 MB each and at most
 80 megapixels for JPEG, 45 for PNG, 25 for transparent PNG and 12 for WebP (checked locally before upload).
+
+### Markets
+
+`market` is `<platform>_<region>`: platform is one of `tiktok`, `amazon`, `temu`, `shein`, `walmart`, `shopee`,
+`etsy`, `own_site` or `other`; region is `us`, `uk` or `jp` (shown as Asia). For `other_*` markets add a top-level
+`platform_label` with the platform's name (up to 40 characters), e.g. `"market": "other_us", "platform_label": "Wayfair"`.
+For `own_site_*` markets, `scenario.can_split_traffic` (`"yes"` / `"no"` / `"not_sure"`) tells the report whether you
+can split live traffic between versions.
 
 ### Optional: compare different products
 
@@ -101,6 +109,8 @@ result = client.run_experiment(
     persona_count=25,                  # up to 100 without a plan, 500 on Base, 2,000 on Pro
                                        # (a larger persona_count is lowered to the limit)
     context="Sign-up page: bigger free-trial banner",
+    product_price=15,             # optional: price of the product shown, in the region currency
+    can_split_traffic="no",       # optional: "yes" / "no" / "not_sure" (decides the report's rollout advice)
     positive_decision="Start the free trial", negative_decision="Leave the page",
 )
 print(result.winner, result.lift, result.confidence)

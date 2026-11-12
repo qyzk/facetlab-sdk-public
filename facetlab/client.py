@@ -128,6 +128,8 @@ class FacetLabClient:
         poll_interval: int = 15,
         timeout: int = 1800,
         check_balance: bool = True,
+        product_price: Optional[float] = None,
+        can_split_traffic: Optional[str] = None,
     ) -> ExperimentResult:
         """
         Run an A/B test simulation with AI personas.
@@ -149,6 +151,9 @@ class FacetLabClient:
             timeout: Max seconds to wait (default: 1800)
             check_balance: Check free tests and balance first (raises InsufficientFundsError before uploading;
                 a free test covers only a test with up to 100 personas)
+            product_price: Optional price of the product shown, a number above 0 in the region's currency
+            can_split_traffic: Optional "yes", "no" or "not_sure": whether you can split live traffic
+                between versions (decides the report's rollout advice)
             
         Returns:
             ExperimentResult with winner, confidence, lift, segmentation, recommendations
@@ -156,6 +161,11 @@ class FacetLabClient:
         # Validate locale
         if locale not in ["usa", "europe", "asia"]:
             raise ValueError("locale must be 'usa', 'europe', or 'asia'")
+        if can_split_traffic not in (None, "yes", "no", "not_sure"):
+            raise ValueError("can_split_traffic must be 'yes', 'no' or 'not_sure'")
+        if product_price is not None and (isinstance(product_price, bool)
+                                          or not isinstance(product_price, (int, float)) or not product_price > 0):
+            raise ValueError("product_price must be a number above 0")
         
         # Image checks first (type, 5 MB each, the request size), so nothing is sent that the server would refuse.
         for path in (control_image, treatment_image):
@@ -190,6 +200,11 @@ class FacetLabClient:
             "experiment_goal": experiment_goal
         }
         
+        if product_price is not None:
+            payload["product_price"] = product_price
+        if can_split_traffic is not None:
+            payload["can_split_traffic"] = can_split_traffic
+
         result = check(self.session.post(f"{self.base_url}/experiments/create", json=payload, timeout=120))
         return self.wait_experiment(result["job_id"], poll_interval=poll_interval, timeout=timeout)
 

@@ -198,3 +198,39 @@ def test_extract_facts_sends_screenshots_and_text(tmp_path):
     assert base64.b64decode(kwargs["json"]["images"][0]["data"]).startswith(b"\x89PNG")
     with pytest.raises(FacetLabError):
         client.product_tests.extract_facts()
+
+
+def _exp_client(tmp_path):
+    from PIL import Image
+    a, b = tmp_path / "a.png", tmp_path / "b.png"
+    Image.new("RGB", (40, 30), "white").save(a)
+    Image.new("RGB", (40, 30), "black").save(b)
+    client = FacetLabClient(api_key="fl_test")
+    client.session = MagicMock()
+    client.session.post.return_value = resp(200, {"job_id": "exp-1", "status": "queued"})
+    client.wait_experiment = MagicMock(return_value="done")
+    return client, str(a), str(b)
+
+
+def test_run_experiment_sends_price_and_split_answer(tmp_path):
+    client, a, b = _exp_client(tmp_path)
+    client.run_experiment(a, b, persona_count=10, product_price=15, can_split_traffic="no",
+                          check_balance=False, timeout=0)
+    payload = client.session.post.call_args.kwargs["json"]
+    assert payload["product_price"] == 15 and payload["can_split_traffic"] == "no"
+
+
+def test_run_experiment_omits_price_and_split_by_default(tmp_path):
+    client, a, b = _exp_client(tmp_path)
+    client.run_experiment(a, b, persona_count=10, check_balance=False, timeout=0)
+    payload = client.session.post.call_args.kwargs["json"]
+    assert "product_price" not in payload and "can_split_traffic" not in payload
+
+
+@pytest.mark.parametrize("kwargs", [{"can_split_traffic": "maybe"}, {"product_price": 0},
+                                    {"product_price": -3}, {"product_price": "15"}])
+def test_run_experiment_rejects_bad_price_or_split_before_any_request(tmp_path, kwargs):
+    client, a, b = _exp_client(tmp_path)
+    with pytest.raises(ValueError):
+        client.run_experiment(a, b, persona_count=10, check_balance=False, timeout=0, **kwargs)
+    client.session.post.assert_not_called()
