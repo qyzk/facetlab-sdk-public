@@ -21,7 +21,7 @@ Version 0.3.0, Python 3.8+. (Not on PyPI yet.) To upgrade: `pip install -U git+h
    once: if you didn't copy it, revoke it there and create a new one.
 2. Optional: add a card on [Billing](https://qyzkdesign.com/dashboard/billing) for a one-time $25 credit
    (a $0 check, nothing is charged) and top up your balance. See [Billing](#billing) below.
-3. Run a product page test (2–6 versions of a product page on TikTok Shop, Amazon, Temu, Shein, Walmart, Shopee, Etsy, your own site or another platform, in the US, UK or Asia):
+3. Run a product page test (2–6 versions of a product page on TikTok Shop, Amazon, Temu, SHEIN, Walmart, Shopee, Etsy, your own site or another platform, in the US, UK or Asia):
 
 ```python
 from facetlab import FacetLabClient
